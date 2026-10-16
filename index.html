@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Démonstrateur – Traitement agentique des alertes LCB-FT</title>
+<style>
+:root{
+  --ink:#1E1240; --ink2:#2E1F63;
+  --primary:#4B1FC2; --primary-soft:#EEE8FC;
+  --human:#8A2BB8; --human-soft:#F5E9FB;
+  --orch:#4A3F7A; --orch-soft:#ECEAF4;
+  --muted:#6E6891; --line:#E5E0F2; --bg:#F7F5FC; --card:#FFFFFF;
+  --ok:#3F2F9E; --ok-soft:#E9E6F9;
+  --warn:#9A4FD0; --warn-soft:#F3EAFB;
+  --risk:#9B1B63; --risk-soft:#F9E7F1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.45}
+header{background:linear-gradient(90deg,var(--ink),var(--ink2));color:#fff;padding:12px 22px;display:flex;align-items:center;justify-content:space-between;height:60px}
+header .t1{font-size:15px;font-weight:600}
+header .t2{font-size:11.5px;opacity:.75}
+.hstats{display:flex;gap:20px;font-size:11.5px;align-items:center}
+.hstats div b{display:block;font-size:14px}
+.hm-count b{color:#D9B8F2}
+.hbtn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.layout{display:grid;grid-template-columns:250px 1fr 330px;gap:14px;padding:14px;height:calc(100vh - 60px)}
+.col{overflow:auto}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+.panel h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px;font-weight:600}
+.pipe{list-style:none}
+.pipe li{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-radius:8px;margin-bottom:2px}
+.pipe li .dot{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--line);color:var(--muted)}
+.pipe li.done .dot{background:var(--ok);color:#fff}
+.pipe li.active{background:var(--primary-soft)}
+.pipe li.active .dot{background:var(--primary);color:#fff}
+.pipe li.human .dot{box-shadow:0 0 0 2px var(--human)}
+.pipe .lbl{font-weight:600;font-size:12.5px}
+.pipe .sub{font-size:11px;color:var(--muted)}
+.legend{font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px}
+.kv dt{color:var(--muted)}
+.kv dd{font-weight:500}
+.stephead{margin-bottom:12px}
+.stephead h2{font-size:18px;font-weight:600;margin-top:4px}
+.stephead p{color:var(--muted);font-size:12.5px;margin-top:2px;max-width:680px}
+.tag{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.02em}
+.tag.agent{background:var(--primary-soft);color:var(--primary)}
+.tag.human{background:var(--human-soft);color:var(--human)}
+.tag.orch{background:var(--orch-soft);color:var(--orch)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.risk{background:var(--risk-soft);color:var(--risk)}
+.tag.grey{background:#F0EEF6;color:#8E89A8}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.score{font-size:32px;font-weight:700;color:var(--primary)}
+.subagent{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}
+.subagent .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.subagent .sh b{font-size:13px}
+.prog{height:4px;background:var(--line);border-radius:3px;overflow:hidden;margin:6px 0 8px}
+.prog i{display:block;height:100%;width:0;background:var(--primary);transition:width 1.4s ease}
+.subagent ul{padding-left:16px;font-size:12px}
+.subagent li{margin-bottom:3px}
+.hidden{display:none!important}
+.src{font-size:10px;color:var(--primary);font-weight:600;background:var(--primary-soft);padding:0 5px;border-radius:4px;margin-left:3px;white-space:nowrap}
+.hmoment{border:2px solid var(--human);background:linear-gradient(180deg,var(--human-soft),#fff 60%);border-radius:12px;padding:16px;margin-top:4px}
+.hmoment .hmh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.hmoment .hmh .badge{background:var(--human);color:#fff;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.04em}
+.hmoment .hmh b{font-size:14px}
+.hmoment p.why{font-size:12px;color:#5A4A78;margin-bottom:12px}
+.choices{display:flex;gap:10px;flex-wrap:wrap}
+.choice{flex:1;min-width:180px;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;cursor:pointer;transition:.15s}
+.choice:hover{border-color:var(--human)}
+.choice.sel{border-color:var(--human);background:var(--human-soft)}
+.choice b{display:block;font-size:12.5px;margin-bottom:2px}
+.choice small{color:var(--muted);font-size:11px}
+.choice .reco{float:right;font-size:9.5px;font-weight:700;color:var(--primary);background:var(--primary-soft);padding:1px 6px;border-radius:10px}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn.p{background:var(--primary);color:#fff}
+.btn.h{background:var(--human);color:#fff}
+.btn.g{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;align-items:center}
+textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:12px;resize:vertical;color:var(--ink)}
+textarea:focus,input:focus{outline:2px solid var(--primary-soft);border-color:var(--primary)}
+.msg{border:1px solid var(--line);border-radius:10px;background:#FBFAFE;padding:12px;font-size:12.5px}
+.msg .mh{font-size:11px;color:var(--muted);margin-bottom:6px}
+.guard{display:flex;gap:8px;align-items:center;font-size:11.5px;margin-top:8px;padding:7px 10px;border-radius:8px}
+.guard.ok{background:var(--ok-soft);color:var(--ok)}
+.guard.ko{background:var(--risk-soft);color:var(--risk)}
+.callout{border-left:3px solid var(--primary);background:var(--primary-soft);padding:9px 12px;border-radius:0 8px 8px 0;font-size:12px;margin:10px 0}
+.callout.risk{border-color:var(--risk);background:var(--risk-soft)}
+.callout.orch{border-color:var(--orch);background:var(--orch-soft)}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+.timeline{display:flex;margin:10px 0}
+.timeline div{flex:1;text-align:center;font-size:11px;padding:8px 4px;border-top:3px solid var(--line);color:var(--muted)}
+.timeline div.on{border-color:var(--primary);color:var(--ink);font-weight:600}
+.timeline div.wait{border-color:var(--warn);color:var(--warn);font-weight:600}
+.conf{display:flex;align-items:center;gap:12px}
+.ring{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--primary)}
+.check{font-size:12px;display:flex;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line)}
+.check:last-child{border:none}
+.check .st{width:16px;flex-shrink:0;font-weight:700}
+.st.ok{color:var(--ok)} .st.ko{color:var(--risk)} .st.fl{color:var(--warn)}
+.pistes label{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line);font-size:12px;cursor:pointer}
+.pistes label:last-child{border:none}
+.pistes input{accent-color:var(--human);margin-top:2px}
+.doc{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:#fff;font-size:12.5px}
+.doc h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--primary);margin:12px 0 5px}
+.doc h4:first-child{margin-top:0}
+.doc p{margin-bottom:5px}
+.journal{font-size:11.5px}
+.jentry{padding:8px 0 8px 10px;border-left:2px solid var(--line);margin-left:4px;position:relative}
+.jentry:before{content:"";position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.jentry.agent:before{background:var(--primary)}
+.jentry.human{background:var(--human-soft);border-left-color:var(--human);border-radius:0 6px 6px 0}
+.jentry.human:before{background:var(--human)}
+.jentry.orch:before{background:var(--orch)}
+.jentry .jt{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px}
+.jentry .ja{font-weight:600;margin:1px 0}
+.jentry .jd{color:#4F4775}
+.jfoot{font-size:10.5px;color:var(--muted);margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.tabs{display:flex;gap:4px;margin-bottom:10px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.advisor{border:1px dashed var(--human);border-radius:10px;padding:12px;background:#fff}
+.kpi{text-align:center;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.kpi b{display:block;font-size:22px;color:var(--primary)}
+.kpi small{color:var(--muted);font-size:11px}
+.sim{font-size:10.5px;color:var(--muted);font-style:italic}
+/* chat */
+.chat{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.chathead{background:var(--primary-soft);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.chathead b{color:var(--primary)}
+.chatbody{height:250px;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:#FCFBFF}
+.bub{max-width:82%;padding:8px 11px;border-radius:12px;font-size:12px}
+.bub.a{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:3px}
+.bub.u{background:var(--human);color:#fff;align-self:flex-end;border-bottom-right-radius:3px}
+.bub .who{font-size:10px;font-weight:700;opacity:.7;margin-bottom:2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--line)}
+.chip{font-size:11px;border:1px solid var(--line);background:#fff;border-radius:20px;padding:3px 10px;cursor:pointer;color:var(--primary)}
+.chip:hover{background:var(--primary-soft)}
+.chatin{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.chatin input{flex:1}
+/* intro */
+#intro{height:calc(100vh - 60px);overflow:auto;padding:22px 28px}
+.hero h1{font-size:22px;font-weight:700;color:var(--ink)}
+.hero p{color:var(--muted);font-size:13.5px;margin-top:4px;max-width:860px}
+.flow{display:flex;align-items:stretch;gap:8px;margin:16px 0}
+.fnode{flex:1;border-radius:10px;padding:10px 12px;font-size:11.5px;background:#fff;border:1px solid var(--line)}
+.fnode b{display:block;font-size:12.5px;margin-bottom:2px}
+.fnode.ag{border-top:3px solid var(--primary)}
+.fnode.hu{border-top:3px solid var(--human);background:var(--human-soft);flex:.7}
+.farrow{display:flex;align-items:center;color:var(--muted);font-size:16px}
+.socle{background:var(--orch-soft);border-radius:10px;padding:8px 12px;font-size:11.5px;color:var(--orch);display:flex;gap:18px;flex-wrap:wrap}
+.socle b{color:var(--ink)}
+.casecard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column}
+.casecard .ct{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.casecard h3{font-size:15px;margin:4px 0 6px}
+.casecard p{font-size:12px;color:#4F4775;flex:1}
+.casecard ul{font-size:11.5px;padding-left:16px;margin:8px 0;color:#4F4775}
+.queue tr.play{cursor:pointer}
+.queue tr.play:hover td{background:var(--primary-soft)}
+.queue tr.off td{color:#A9A4C2}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="t1" id="hTitle">Traitement agentique des alertes LCB-FT</div>
+    <div class="t2" id="hSub">Démonstrateur Wavestone · Données fictives · Banque de détail</div>
+  </div>
+  <div class="hstats" id="hStats">
+    <div>Dossier<b id="hId">–</b></div>
+    <div>Échéance prévue<b id="hEta">–</b></div>
+    <div class="hm-count">Décisions humaines<b id="hHuman">–</b></div>
+    <button class="hbtn" onclick="showIntro()">Retour à la vision</button>
+  </div>
+</header>
+
+<div id="intro"></div>
+
+<div class="layout hidden" id="app">
+  <div class="col">
+    <div class="panel"><h3>Chaîne de traitement</h3><ul class="pipe" id="pipe"></ul></div>
+    <div class="panel"><h3>Client</h3><dl class="kv" id="clientCard"></dl></div>
+    <div class="panel"><h3>Légende</h3>
+      <div class="legend">
+        <div><span style="background:var(--primary)"></span>Agent IA</div>
+        <div><span style="background:var(--human)"></span>Décision humaine</div>
+        <div><span style="background:var(--orch)"></span>Orchestrateur (règles fixes)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col" id="main"></div>
+  <div class="col">
+    <div class="panel">
+      <h3>Journal d'audit – enregistré au fil de l'eau</h3>
+      <div class="journal" id="journal"></div>
+      <div class="jfoot">Journal immuable horodaté. Chaque entrée référence les données lues, la version du modèle et du prompt. L'agent Synthèse le met en forme, il ne le reconstitue pas.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   DONNÉES DES CAS
+   ===================================================================== */
+const STEPDEF={
+ triage:{lbl:'Triage & planification',sub:'Agent 1'},
+ analyse:{lbl:'Analyse N1',sub:'Agent 2 · 4 sous-agents'},
+ canal:{lbl:'Contact client',sub:'Décision analyste',human:true},
+ preuves:{lbl:'Pièces & vraisemblance',sub:'Agent 2 · Preuves'},
+ qualite:{lbl:'Contrôle qualité & proposition',sub:'Décision analyste N1',human:true},
+ n2:{lbl:'Analyse renforcée',sub:'Agent 3 · L\'expert mène',human:true},
+ synthese:{lbl:'Synthèse & validation',sub:'Agent 4 · Validation humaine',human:true},
+ cloture:{lbl:'Clôture & apprentissage',sub:'Agent 5 · hors ligne'}
+};
+
+const CASES={
+/* ------------------------------------------------------------------ A */
+A:{
+ id:'DOS-2026-1148', name:'Marceau Distribution SARL', type:'Professionnel',
+ typo:'Fractionnement d\'espèces et justificatifs incohérents', nbAlerts:3, score:74, prio:'P2', orient:'N1 → N2',
+ pitch:'Les justificatifs fournis par le client ne tiennent pas au contrôle de vraisemblance. L\'agent propose l\'examen renforcé, l\'expert découvre un réseau de sociétés liées.',
+ shows:['Regroupement de 3 alertes','Demande de pièces neutre et garde-fou anti-divulgation','Contrôle de vraisemblance des factures','Échange avec l\'agent en N2'],
+ humanTotal:4, eta:'J+6 ouvrés', eta2:'J+5 ouvrés',
+ path:['triage','analyse','canal','preuves','qualite','n2','synthese','cloture'],
+ client:[['Raison sociale','Marceau Distribution SARL'],['Activité','Négoce matériel électronique'],['Siège','Lyon (69)'],['Client depuis','2019'],['Risque KYC','<span class="tag warn" id="kycRisk">Moyen</span>'],['CA déclaré','640 k€ (2025)'],['Conseiller','Agence Lyon Part-Dieu']],
+ init:[['orch','Orchestrateur','Réception de 3 alertes','Outil de détection · ALT-24871, ALT-24893, ALT-24902'],['agent','Agent Triage','Regroupement et orientation','Score 74/100 · P2 (relevée par ML) · file N1 · règles fixes vérifiées · prompt triage-2.1']],
+ triage:{
+  title:'3 alertes regroupées en 1 dossier client',
+  alerts:[['ALT-24871','Dépôts d\'espèces fractionnés','11 dépôts entre 8 500 et 9 800 € en 3 semaines','102 400 €'],['ALT-24893','Hausse brutale des flux entrants','+310 % vs moyenne mensuelle 12 mois','412 000 €'],['ALT-24902','Virements vers contrepartie nouvelle hors UE','3 virements vers Nexora Trading Ltd (Hong Kong)','186 000 €']],
+  rows:[['Typologie (fractionnement + flux sortants)',28],['Montants cumulés',18],['Juridiction contrepartie',14],['Risque KYC client (moyen)',8],['Historique d\'alertes 12 mois',6]],
+  ml:'Signal ML : priorité relevée de P3 à <b>P2</b> (concomitance dépôts / virements sortants sous 48 h).',
+  rules:[['ok','Aucun hit sanctions ou gel des avoirs'],['ok','Client non PEP, aucun bénéficiaire effectif PEP'],['ok','Risque KYC ≠ élevé'],['ok','Score < 80 : pas d\'orientation directe N2']],
+  orient:'File N1 – instruction agentique',
+  plan:[['Échéance interne','10 j ouvrés'],['Durée prévue (dont attente pièces 3 j)','6 j ouvrés'],['Affectation','Analyste N1 – C. Rivière']],
+  expl:'Le dossier combine des dépôts d\'espèces sous le seuil de 10 000 € et des sorties rapides vers une contrepartie hors UE récemment apparue. Aucun critère n\'impose un passage direct en N2 : l\'instruction N1 est engagée en priorité P2.',
+  btn:'Prendre le dossier et lancer l\'analyse'
+ },
+ analyse:{
+  intro:'Les sous-agents KYC, Transactions et Screening travaillent simultanément. Le sous-agent Preuves identifie ensuite les pièces nécessaires en exploitant d\'abord les données internes.',
+  subs:[
+   ['kyc','KYC 360','Référentiel KYC · CRM · GED','<li>Activité déclarée : négoce B2B, clients professionnels</li><li>Flux mensuels attendus : ~55 k€ <span class="src">P1</span></li><li><b>Écart :</b> 412 k€ entrants en 3 semaines, soit 7× l\'attendu <span class="src">P2</span></li><li>Aucune mise à jour KYC depuis 2024</li>','Profil consolidé · écart activité 7× · P1-P2'],
+   ['trx','Transactions','Cœur bancaire · SEPA / SWIFT','<li>11 dépôts d\'espèces de 8,5 à 9,8 k€, dans plusieurs agences <span class="src">P3</span></li><li>Virements Nexora 48 h après chaque série de dépôts <span class="src">P4</span></li><li>Typologie probable : <b>fractionnement puis transfert hors UE</b></li><li>Aucun flux fournisseur cohérent avec un négoce</li>','Fractionnement + transfert hors UE · P3-P4'],
+   ['scr','Screening','Listes sanctions/PEP · RNE · RBE · Presse','<li>Sanctions / PEP : aucun hit</li><li>Nexora Trading Ltd : immatriculée il y a 7 mois, activité déclarée « conseil » <span class="src">P5</span></li><li>Presse négative : 1 homonyme <b>écarté</b> (date de naissance différente)</li>','0 hit · 1 faux positif presse écarté · P5']
+  ],
+  pvTitle:'Sous-agent Preuves – pièces nécessaires',
+  pieces:[['Kbis et statuts','Identité, objet social','GED interne','ok'],['Liasse fiscale 2025','CA et marges de référence','GED interne','ok'],['Factures liées aux dépôts d\'espèces','Origine des fonds déposés','Client','warn'],['Contrat et factures Nexora Trading','Justification économique des virements','Client','warn']],
+  pvNote:'2 pièces sur 4 trouvées en interne : la demande au client est limitée au strict nécessaire.',
+  pvLog:'2 trouvées en GED · 2 à demander au client',
+  btn:'Préparer la demande de pièces'
+ },
+ canal:{
+  title:'Demande de pièces au client',
+  intro:'L\'agent propose un canal et rédige une demande neutre. Le garde-fou anti-divulgation contrôle le texte avant tout envoi.',
+  gabarit:'Gabarit conformité « Mise à jour dossier professionnel » v2',
+  msg:'Bonjour Monsieur Marceau,\n\nDans le cadre de la mise à jour régulière de votre dossier professionnel, nous vous remercions de nous transmettre les factures correspondant à vos encaissements du mois de septembre ainsi que le contrat et les factures relatifs à votre partenaire Nexora Trading Ltd.\n\nVotre conseiller reste à votre disposition.',
+  advisor:'<b>Collecte de pièces – Marceau Distribution SARL</b><p style="margin:6px 0">Motif affiché : <i>Mise à jour du dossier professionnel</i>. Échéance : 3 jours ouvrés.</p><p>Pièces : factures des encaissements de septembre ; contrat et factures Nexora Trading Ltd.</p>',
+  why:'Arbitrage entre préservation de la relation et délai de traitement. L\'agent propose, l\'analyste valide ou change.',
+  reco:'Via le conseiller',
+  choices:[['Via le conseiller','Relation préservée · délai prévu 3 j · client historique depuis 2019'],['Digital direct (conseiller en copie)','Dépôt sur l\'espace client · délai prévu 2 j']]
+ },
+ preuves:{
+  tl:['J0 · Demande envoyée','J+1→J+3 · Attente','J+2 · Relance auto.','J+3 · Pièces reçues','J+3 · Contrôle'],
+  recv:[['6 factures clients','Ventes « au comptant » de 8 600 à 9 700 € à des particuliers, réglées en espèces <span class="src">P6</span>'],['Contrat Nexora Trading','Prestation « d\'approvisionnement en composants », paiement à la commande <span class="src">P7</span>']],
+  checks:[['ko','<b>Plafond légal espèces :</b> au-delà de 1 000 €, un professionnel ne peut pas être payé en espèces par un particulier résident. Les factures sont incompatibles avec la réglementation. <span class="src">P6</span>'],['ko','<b>Numérotation :</b> factures n° 2026-031 à 036 émises en 3 semaines, alors que la n° 2026-030 date de janvier. <span class="src">P6</span>'],['ko','<b>Cohérence contrepartie :</b> l\'objet du contrat (composants) ne correspond pas à l\'activité déclarée de Nexora (conseil), et aucune livraison n\'est tracée. <span class="src">P5</span><span class="src">P7</span>'],['ok','<b>Identité et pouvoirs :</b> signataire conforme au Kbis. <span class="src">P1</span>']],
+  log:'3 incohérences : plafond espèces, numérotation, objet du contrat · P5-P7',
+  delayDays:3
+ },
+ qualite:{
+  conf:0.86,
+  checks:['9 affirmations sur 9 rattachées à une preuve (P1 à P7)','Aucune contradiction entre sous-agents','Faux positif presse documenté','Hypothèse alternative examinée : saisonnalité d\'activité, non étayée par l\'historique 2019-2025'],
+  propTitle:'Examen renforcé (N2)', propCls:'risk',
+  propText:'Fonds d\'origine non justifiée : les factures produites ne peuvent pas expliquer les dépôts d\'espèces. Ces fonds sont transférés sous 48 h vers une contrepartie récente, sans substance économique démontrée.',
+  callout:['risk','Typologie : fractionnement d\'espèces, justificatifs de complaisance, transfert hors UE.'],
+  reco:'renforce', recoLog:'Examen renforcé · confiance 0,86 · 9/9 affirmations sourcées'
+ },
+ n2:{
+  graph:`<svg viewBox="0 0 380 250" style="width:100%"><g stroke="#CFC4EE" stroke-width="1.5"><line x1="190" y1="125" x2="80" y2="50"/><line x1="190" y1="125" x2="310" y2="60"/><line x1="190" y1="125" x2="95" y2="205"/><line x1="310" y1="60" x2="300" y2="200"/><line x1="95" y1="205" x2="300" y2="200" stroke="#9B1B63" stroke-dasharray="4 3"/><line x1="80" y1="50" x2="95" y2="205" stroke="#9B1B63" stroke-dasharray="4 3"/></g><g font-size="10" text-anchor="middle" font-family="Segoe UI"><circle cx="190" cy="125" r="27" fill="#4B1FC2"/><text x="190" y="122" fill="#fff" font-weight="600">Marceau</text><text x="190" y="134" fill="#fff">Distribution</text><circle cx="80" cy="50" r="21" fill="#EEE8FC" stroke="#4B1FC2"/><text x="80" y="53">J. Marceau</text><circle cx="310" cy="60" r="24" fill="#F9E7F1" stroke="#9B1B63"/><text x="310" y="57">Nexora</text><text x="310" y="69">HK</text><circle cx="95" cy="205" r="22" fill="#F3EAFB" stroke="#9A4FD0"/><text x="95" y="202">Velbo</text><text x="95" y="214">SAS</text><circle cx="300" cy="200" r="22" fill="#F3EAFB" stroke="#9A4FD0"/><text x="300" y="197">Prima</text><text x="300" y="209">EURL</text><text x="250" y="88" fill="#6E6891" font-size="9">186 k€</text><text x="320" y="135" fill="#6E6891" font-size="9">94 k€</text><text x="200" y="215" fill="#9B1B63" font-size="9">même domiciliation</text><text x="58" y="130" fill="#9B1B63" font-size="9">ex-gérant</text></g></svg>`,
+  graphNote:'Deux autres clients de la banque liés au même réseau.',
+  corr:[['Velbo SAS','J. Marceau ex-gérant · même domiciliation que Prima','Alerte espèces classée sans suite en 03/2026'],['Prima Négoce EURL','Virements vers Nexora (94 k€)','Aucune alerte']],
+  corrNote:'Le classement Velbo de mars 2026 reposait sur des factures du même gabarit. <b>Réexamen suggéré.</b>',
+  pistes:[['Rapprochement chronologique des dépôts et virements sur les 3 entités',true],['Revue KYC renforcée : bénéficiaires effectifs, entretien avec le dirigeant',true],['Réouverture du dossier Velbo SAS classé en mars 2026',false],['Recherche registre Hong Kong : dirigeants et actionnaires de Nexora',false]],
+  chips:['Que sait-on de Velbo SAS ?','Montre la chronologie dépôts / virements','Qui est derrière Nexora ?','Quelles agences pour les dépôts ?'],
+  chat:[
+   [['velbo'],'Velbo SAS : cliente depuis 2021, ex-gérant J. Marceau jusqu\'en 2024. Une alerte « dépôts d\'espèces » a été classée sans suite en 03/2026 sur la base de 4 factures au comptant. Le gabarit de ces factures est identique à celui des pièces P6 (même mise en page, même mention de TVA erronée). <span class="src">N2-1</span> Je peux préparer la demande de réouverture si vous le décidez.'],
+   [['chrono','délai','delai','calendrier'],'Sur les 3 entités, 14 séries de dépôts suivies d\'un virement vers Nexora. Délai médian entre le dernier dépôt et le virement : 41 h. Prima Négoce reproduit le même schéma depuis le 15/09. <span class="src">P3</span><span class="src">P4</span><span class="src">N2-2</span>'],
+   [['nexora','hong','derrière','derriere','actionnaire'],'Nexora Trading Ltd : immatriculée à Hong Kong en 02/2026, activité déclarée « conseil ». Le registre ne mentionne qu\'un administrateur, sans lien direct identifié avec Marceau. Le bénéficiaire effectif n\'est pas connu à ce stade : c\'est la piste « Recherche registre Hong Kong ». <span class="src">P5</span>'],
+   [['agence','espèce','espece','dépôt','depot'],'Les 11 dépôts ont été effectués dans 4 agences de Lyon et Villeurbanne, jamais deux fois de suite dans la même. Ce schéma de rotation est typique d\'une volonté d\'éviter l\'attention d\'un même guichet. <span class="src">P3</span>'],
+   [['bénéficiaire','beneficiaire','rbe'],'Bénéficiaire effectif déclaré au RBE : J. Marceau (100 %). Aucun changement depuis 2019. <span class="src">P1</span>']
+  ],
+  chatDef:'Je n\'ai pas d\'élément tracé dans le dossier sur ce point. Je peux lancer une recherche dans le case management, les flux ou les sources ouvertes : précisez la question et je vous indiquerai les sources consultées.',
+  why:'Décision engageant la banque : seule l\'expertise humaine qualifie le soupçon. L\'agent ne formule aucune recommandation à ce stade.',
+  choices:[['Déclaration de soupçon','Rédaction de la DS par l\'agent Synthèse'],['Vigilance renforcée','Surveillance accrue, risque KYC relevé'],['Classement motivé','Note de classement']],
+  mot:'Origine des fonds non justifiée, justificatifs non conformes, réseau de sociétés liées vers une contrepartie sans substance.'
+ },
+ doc(dec,pistes){return `
+  <h4>Décision</h4><p>${dec} – décision de l'expert N2, motivée.</p>
+  <h4>Personne concernée</h4><p>Marceau Distribution SARL, négoce de matériel électronique, Lyon, cliente depuis 2019 <span class="src">P1</span>.</p>
+  <h4>Faits</h4>
+  <p>Entre le 8 et le 29 septembre 2026, 11 dépôts d'espèces de 8 500 à 9 800 €, pour 102 400 €, ont été effectués dans plusieurs agences <span class="src">P3</span>.</p>
+  <p>Dans les 48 heures suivant chaque série de dépôts, des virements pour 186 000 € ont été émis vers Nexora Trading Ltd (Hong Kong), société immatriculée depuis 7 mois et déclarant une activité de conseil <span class="src">P4</span><span class="src">P5</span>.</p>
+  <p>Les flux entrants sur la période représentent 7 fois le niveau attendu au regard du CA déclaré <span class="src">P1</span><span class="src">P2</span>.</p>
+  <h4>Éléments d'analyse</h4>
+  <p>Les factures produites pour justifier les espèces font état de paiements en espèces supérieurs au plafond légal, avec une numérotation incohérente <span class="src">P6</span>. Le contrat Nexora ne correspond pas à l'activité de la contrepartie et aucune livraison n'est tracée <span class="src">P7</span>.</p>
+  <p>Deux autres clients de la banque sont liés à ce réseau (dirigeant commun, domiciliation partagée, même contrepartie) <span class="src">N2-1</span>.</p>
+  <h4>Investigations menées par l'expert</h4><p>${pistes}.</p>`},
+ valid:{ds:'Validation par le déclarant Tracfin',other:'Validation par le responsable LCB-FT',actor:'Déclarant Tracfin – M. Garnier'},
+ writes(ds){return (ds?[['ERMES (Tracfin)','Déclaration de soupçon transmise','ok','Accusé de réception']]:[]).concat([['Case management','Dossier, décisions, pièces et journal archivés','ok','Fait'],['Référentiel KYC','Risque client relevé à « élevé », revue avancée','ok','Fait'],['Orchestrateur','Création de dossiers liés : Velbo SAS, Prima Négoce EURL','agent','En file N1']])},
+ kycAfter:['risk','Élevé'],
+ learn:['<b>Scénario « dépôts fractionnés » :</b> ajouter un critère de sortie hors UE sous 72 h pour relever le score.','<b>Contrôle de vraisemblance :</b> intégrer le gabarit de factures détecté à la base de référence.','<b>Qualité des décisions :</b> le classement Velbo SAS (03/2026) contredit ce dossier ; il est signalé pour revue.'],
+ delay:'3 j'
+},
+
+/* ------------------------------------------------------------------ B */
+B:{
+ id:'DOS-2026-1163', name:'Claire Vasseur', type:'Particulier CSP+',
+ typo:'Virement interne > 10 k€ – succession', nbAlerts:2, score:31, prio:'P4', orient:'N1 → classement',
+ pitch:'Un virement interne atypique s\'explique par une succession. L\'agent identifie l\'information dans le CRM, obtient l\'acte notarié et propose un classement motivé.',
+ shows:['Exploitation des notes du conseiller','Une seule pièce demandée au client','Vérification de l\'acte notarié','Classement motivé et KYC enrichi'],
+ humanTotal:3, eta:'J+3 ouvrés', eta2:'J+1 ouvré',
+ path:['triage','analyse','canal','preuves','qualite','synthese','cloture'],
+ client:[['Nom','Claire Vasseur'],['Âge','54 ans'],['Profession','Directrice financière (CSP+)'],['Résidence','Paris 16e'],['Client depuis','2008'],['Risque KYC','<span class="tag ok" id="kycRisk">Faible</span>'],['Revenus','11 k€ nets / mois'],['Conseiller','Agence Paris Auteuil']],
+ init:[['orch','Orchestrateur','Réception de 2 alertes','Outil de détection · ALT-25131, ALT-25134'],['agent','Agent Triage','Regroupement et orientation','Score 31/100 · P4 · file N1 · règles fixes vérifiées · prompt triage-2.1']],
+ triage:{
+  title:'2 alertes regroupées en 1 dossier client',
+  alerts:[['ALT-25131','Virement interne > 10 k€ atypique au regard du profil','Virement reçu le 29/09 depuis le compte « Succession Henri Vasseur » (même banque)','120 000 €'],['ALT-25134','Versement atypique sur épargne','Versement sur contrat d\'assurance-vie interne le 01/10','80 000 €']],
+  rows:[['Montant',14],['Écart à l\'historique du client',10],['Typologie (flux interne)',4],['Risque KYC client (faible)',3],['Historique d\'alertes 12 mois',0]],
+  ml:'Aucun signal additionnel du modèle. Priorité maintenue en <b>P4</b>.',
+  rules:[['ok','Aucun hit sanctions ou gel des avoirs'],['ok','Client et défunt non PEP'],['ok','Risque KYC faible'],['ok','Score < 80 : pas d\'orientation directe N2']],
+  orient:'File N1 – instruction agentique',
+  plan:[['Échéance interne','10 j ouvrés'],['Durée prévue (dont attente pièce 2 j)','3 j ouvrés'],['Affectation','Analyste N1 – C. Rivière']],
+  expl:'Flux interne entre deux comptes de la banque, ordonné depuis un compte de succession. Le montant est atypique pour la cliente, mais son origine est traçable. Instruction N1 standard.',
+  btn:'Prendre le dossier et lancer l\'analyse'
+ },
+ analyse:{
+  intro:'Les sous-agents travaillent simultanément. Le sous-agent KYC 360 exploite les notes du conseiller ; le sous-agent Preuves cherche d\'abord les pièces déjà présentes en interne.',
+  subs:[
+   ['kyc','KYC 360','Référentiel KYC · CRM · GED','<li>Cadre dirigeante, revenus 11 k€ nets / mois <span class="src">P1</span></li><li>Patrimoine déclaré en 2024 : 450 k€</li><li><b>Note conseiller du 21/07/2026 :</b> « décès du père, succession en cours chez Me Lefort » <span class="src">P2</span></li><li>Aucune anomalie KYC</li>','Profil cohérent · note CRM succession · P1-P2'],
+   ['trx','Transactions','Cœur bancaire · comptes internes','<li>Virement de 120 k€ ordonné par l\'étude notariale mandataire du compte succession <span class="src">P3</span></li><li>80 k€ placés en assurance-vie interne, 40 k€ conservés sur le compte courant</li><li>Aucune sortie vers un tiers ou vers l\'étranger</li>','Flux interne traçable · réemploi en épargne · P3'],
+   ['scr','Screening','Listes sanctions/PEP · Annuaire des notaires','<li>Sanctions / PEP : aucun hit (cliente et défunt)</li><li>Me Lefort, notaire à Versailles : référencée à l\'annuaire <span class="src">P4</span></li><li>Presse négative : aucun résultat</li>','0 hit · notaire référencé · P4']
+  ],
+  pvTitle:'Sous-agent Preuves – pièces nécessaires',
+  pieces:[['Acte de décès','Fait générateur','GED (ouverture du compte succession)','ok'],['Mandat de l\'étude notariale','Pouvoir d\'ordonner le virement','GED interne','ok'],['Attestation notariale de répartition','Part revenant à la cliente','Client','warn']],
+  pvNote:'2 pièces sur 3 trouvées en interne : une seule pièce est demandée à la cliente.',
+  pvLog:'2 trouvées en GED · 1 à demander à la cliente',
+  btn:'Préparer la demande de pièce'
+ },
+ canal:{
+  title:'Demande de pièce à la cliente',
+  intro:'L\'agent propose un canal adapté à un client à faible risque et rédige une demande sobre. Le garde-fou contrôle le texte.',
+  gabarit:'Gabarit conformité « Mise à jour dossier – événement familial » v1',
+  msg:'Bonjour Madame Vasseur,\n\nDans le cadre de la mise à jour de votre dossier, nous vous remercions de bien vouloir nous transmettre l\'attestation notariale relative au règlement de la succession de M. Henri Vasseur.\n\nNous vous renouvelons nos sincères condoléances. Votre conseiller reste à votre disposition.',
+  advisor:'<b>Information – Claire Vasseur</b><p style="margin:6px 0">Une pièce a été demandée via l\'espace client : <i>attestation notariale de succession</i>.</p><p>Aucune action requise. Vous êtes en copie pour garder la relation.</p>',
+  why:'Client à faible risque, pièce standard : l\'agent propose le canal le plus rapide. L\'analyste peut préférer le conseiller pour une situation de deuil.',
+  reco:'Digital direct (conseiller en copie)',
+  choices:[['Digital direct (conseiller en copie)','Dépôt sur l\'espace client · délai prévu 1 j'],['Via le conseiller','Contact personnalisé · délai prévu 2 j']]
+ },
+ preuves:{
+  tl:['J0 · Demande envoyée','J0→J+1 · Attente','–','J+1 · Pièce reçue','J+1 · Contrôle'],
+  recv:[['Attestation notariale','Me Lefort, notaire à Versailles, 24/09/2026 : part revenant à Mme Claire Vasseur, 120 000 € ; cohéritier : M. Paul Vasseur <span class="src">P5</span>']],
+  checks:[['ok','<b>Montant :</b> identique au virement reçu (120 000 €). <span class="src">P3</span><span class="src">P5</span>'],['ok','<b>Notaire :</b> référencé et identique au mandataire du compte succession. <span class="src">P4</span>'],['ok','<b>Chronologie :</b> attestation postérieure au décès et antérieure au virement. <span class="src">P5</span>'],['ok','<b>Qualité d\'héritière :</b> la cliente est désignée dans l\'acte. <span class="src">P5</span>'],['ok','<b>Cohérence patrimoniale :</b> réemploi en assurance-vie conforme au profil. <span class="src">P1</span>']],
+  log:'5 contrôles conformes · montant et notaire concordants · P3-P5',
+  delayDays:1
+ },
+ qualite:{
+  conf:0.93,
+  checks:['6 affirmations sur 6 rattachées à une preuve (P1 à P5)','Aucune contradiction entre sous-agents','Fait générateur documenté (décès, mandat, attestation)','Hypothèse alternative examinée : fonds de tiers transitant par la succession, non étayée'],
+  propTitle:'Classement sans suite', propCls:'ok',
+  propText:'Origine des fonds justifiée : succession documentée par un acte notarié, montant concordant, flux interne traçable. Le réemploi en assurance-vie est cohérent avec le profil.',
+  callout:['ok','Mise à jour KYC proposée : ajout de l\'origine de patrimoine « succession – acte notarié ».'],
+  reco:'classement', recoLog:'Classement sans suite · confiance 0,93 · 6/6 affirmations sourcées'
+ },
+ doc(dec){return `
+  <h4>Décision</h4><p>Classement sans suite – décision de l'analyste N1.</p>
+  <h4>Personne concernée</h4><p>Claire Vasseur, directrice financière, cliente depuis 2008, risque KYC faible <span class="src">P1</span>.</p>
+  <h4>Faits</h4>
+  <p>Le 29/09/2026, réception d'un virement interne de 120 000 € depuis le compte « Succession Henri Vasseur », ordonné par l'étude notariale mandataire <span class="src">P3</span>. Le 01/10/2026, versement de 80 000 € sur un contrat d'assurance-vie interne.</p>
+  <h4>Justification</h4>
+  <p>Le décès du père de la cliente est consigné par le conseiller le 21/07/2026 <span class="src">P2</span>. L'attestation de Me Lefort fixe la part revenant à la cliente à 120 000 € <span class="src">P5</span>, montant identique au virement. Le notaire est référencé et mandataire du compte succession <span class="src">P4</span>.</p>
+  <h4>Conclusion</h4><p>Origine des fonds établie, aucun indice de blanchiment. Mise à jour du KYC : origine de patrimoine « succession ».</p>`},
+ valid:{ds:'Validation de la note de classement',other:'Validation de la note de classement',actor:'Analyste N1 – C. Rivière'},
+ writes(){return [['Case management','Dossier, note de classement, pièces et journal archivés','ok','Fait'],['Référentiel KYC','Origine du patrimoine « succession – acte notarié » ajoutée','ok','Fait'],['Contrôle 2e niveau','Dossier versé à l\'échantillon de contrôle mensuel','agent','Planifié']]},
+ kycAfter:['ok','Faible'],
+ learn:['<b>Scénario « virement interne > 10 k€ » :</b> lorsqu\'un flux provient d\'un compte succession ouvert dans la banque, déclencher automatiquement la pré-collecte de l\'attestation notariale. Le score n\'est pas abaissé automatiquement.','<b>Gabarit :</b> ajout du modèle de demande « événement familial » à la bibliothèque validée par la conformité.'],
+ delay:'1 j'
+},
+
+/* ------------------------------------------------------------------ C */
+C:{
+ id:'DOS-2026-1171', name:'Lucas Morel', type:'Particulier – banque en ligne',
+ typo:'Réseau de comptes de passage vers l\'étranger', nbAlerts:4, score:88, prio:'P1', orient:'N2 direct',
+ pitch:'Un compte ouvert en ligne sert de compte de passage vers l\'étranger. Un autre client partage la même adresse et le même comportement. Pas de contact client : l\'expert enquête avec l\'agent.',
+ shows:['Orientation directe en N2 par règle','Détection d\'un client lié (adresse, appareil)','Décision de ne pas contacter le client','Investigation conversationnelle avec l\'agent'],
+ humanTotal:3, eta:'J+3 ouvrés', eta2:'J+3 ouvrés',
+ path:['triage','analyse','canal','n2','synthese','cloture'],
+ client:[['Nom','Lucas Morel'],['Âge','24 ans'],['Profession','Étudiant (déclaré)'],['Adresse','14 rue des Glycines, Créteil'],['Client depuis','05/2026 · 100 % en ligne'],['Risque KYC','<span class="tag ok" id="kycRisk">Faible</span>'],['Revenus déclarés','900 € / mois'],['Client lié','Théo Barret']],
+ init:[['orch','Orchestrateur','Réception de 4 alertes','Outil de détection · ALT-25102, 25108, 25113, 25117'],['agent','Agent Triage','Lien réseau détecté','Théo Barret : même adresse, même empreinte d\'appareil · 2 alertes rattachées'],['agent','Agent Triage','Regroupement et orientation','Score 88/100 · P1 · règle « score ≥ 80 » : orientation directe N2 · prompt triage-2.1']],
+ triage:{
+  title:'4 alertes et 1 client lié regroupés en 1 dossier réseau',
+  alerts:[['ALT-25102','Volume de flux entrants atypique','47 virements entrants de 31 émetteurs différents en 6 semaines','68 400 €'],['ALT-25108','Sortie rapide des fonds','96 % des fonds ressortis en moins de 24 h','65 700 €'],['ALT-25113','Virements vers établissement de paiement étranger','14 virements vers 2 comptes Paysolve UAB (Lituanie)','41 200 €'],['ALT-25117','Achats de crypto-actifs','9 achats sur une plateforme d\'échange','24 500 €']],
+  rows:[['Typologie compte de passage',30],['Volume et nombre de contreparties',20],['Incohérence avec le profil déclaré',16],['Destination étrangère',14],['Client lié avec alertes ouvertes',8]],
+  ml:'Lien réseau : <b>Théo Barret</b> (client depuis 06/2026) partage la même adresse et la même empreinte d\'appareil. 2 alertes ouvertes rattachées au dossier.',
+  rules:[['ok','Aucun hit sanctions ou gel des avoirs'],['ok','Client non PEP'],['fl','Score ≥ 80 : <b>orientation directe N2</b>'],['fl','Client lié avec alertes ouvertes : regroupement réseau']],
+  orient:'Examen renforcé N2 – instruction préparatoire par l\'agent Analyse',
+  plan:[['Échéance interne (P1)','5 j ouvrés'],['Durée prévue','3 j ouvrés'],['Affectation','Expert N2 – A. Delorme']],
+  expl:'Schéma typique de compte de passage : nombreux émetteurs, sortie quasi immédiate vers l\'étranger et les crypto-actifs, revenus déclarés sans rapport avec les flux. La règle d\'orientation directe N2 s\'applique. L\'agent Analyse prépare le dossier pour l\'expert.',
+  btn:'Lancer l\'instruction préparatoire'
+ },
+ analyse:{
+  intro:'L\'orientation N2 est déjà décidée. Les sous-agents préparent le dossier de l\'expert, sur les deux clients liés.',
+  subs:[
+   ['kyc','KYC 360','Référentiel KYC · EER digitale · CRM','<li>Entrée en relation 100 % en ligne en 05/2026 <span class="src">P1</span></li><li>Étudiant, revenus déclarés 900 € / mois</li><li><b>Flux sur 6 semaines :</b> 76 fois les revenus déclarés <span class="src">P2</span></li><li>Adresse et empreinte d\'appareil partagées avec Théo Barret <span class="src">P3</span></li>','EER digitale · flux 76× revenus · lien Barret · P1-P3'],
+   ['trx','Transactions','Cœur bancaire · SEPA · cartes','<li>47 virements entrants de 300 à 2 000 €, libellés « remboursement », « loyer », « cadeau » <span class="src">P4</span></li><li>96 % ressortis sous 24 h vers la Lituanie et une plateforme crypto <span class="src">P5</span></li><li>Théo Barret : schéma quasi identique, mêmes comptes de destination <span class="src">P6</span></li>','Compte de passage · destinations communes Barret · P4-P6'],
+   ['scr','Screening','Listes · réclamations internes · sources ouvertes','<li>Sanctions / PEP : aucun hit</li><li><b>Réclamations internes :</b> 3 émetteurs, clients de la banque, ont déclaré une fraude au faux placement <span class="src">P7</span></li><li>Paysolve UAB : établissement de paiement agréé en Lituanie</li>','0 hit · 3 réclamations fraude liées · P7']
+  ],
+  pvTitle:'Sous-agent Preuves – recommandation',
+  pieces:[['Pièce d\'identité et selfie vidéo (EER)','Vérifier l\'identité réelle','GED interne','ok'],['Relevés et EER de Théo Barret','Comparer les deux profils','Interne','ok'],['Justificatifs des encaissements','Origine des fonds','Client','grey']],
+  pvNote:'<b>Recommandation : ne pas solliciter le client.</b> Une demande risquerait d\'alerter le réseau et d\'accélérer la sortie des fonds encore en transit.',
+  pvLog:'Recommande de ne pas contacter le client (risque de fuite)',
+  btn:'Décider du contact client'
+ },
+ canal:{
+  title:'Faut-il contacter le client ?',
+  intro:'Dans un schéma de compte de passage, une demande de pièces peut alerter le réseau. L\'agent recommande de ne pas contacter le client ; l\'analyste décide.',
+  gabarit:'Gabarit conformité « Mise à jour dossier » v2 (préparé si besoin)',
+  msg:'Bonjour Monsieur Morel,\n\nDans le cadre de la mise à jour de votre dossier, nous vous remercions de nous transmettre tout justificatif relatif aux virements reçus ces dernières semaines.\n\nLe service client reste à votre disposition.',
+  advisor:'<b>Banque en ligne – pas de conseiller dédié</b><p style="margin:6px 0">En cas de demande, elle serait déposée sur l\'espace client et traitée par le service client.</p>',
+  why:'Risque de divulgation et de dissipation des fonds. La décision de ne pas contacter le client est tracée et motivée.',
+  reco:'Ne pas solliciter le client',
+  choices:[['Ne pas solliciter le client','Évite d\'alerter le réseau · le dossier passe directement à l\'expert N2'],['Digital direct','Demande sur l\'espace client · risque de fuite']]
+ },
+ n2:{
+  graph:`<svg viewBox="0 0 380 250" style="width:100%"><g stroke="#CFC4EE" stroke-width="1.5"><line x1="60" y1="70" x2="150" y2="125"/><line x1="60" y1="180" x2="150" y2="125"/><line x1="60" y1="70" x2="150" y2="210"/><line x1="60" y1="180" x2="150" y2="210"/><line x1="150" y1="125" x2="300" y2="70"/><line x1="150" y1="210" x2="300" y2="70"/><line x1="150" y1="125" x2="300" y2="185"/><line x1="150" y1="210" x2="300" y2="185"/><line x1="150" y1="125" x2="150" y2="210" stroke="#9B1B63" stroke-width="2" stroke-dasharray="4 3"/></g><g font-size="10" text-anchor="middle" font-family="Segoe UI"><circle cx="60" cy="70" r="26" fill="#F3EAFB" stroke="#9A4FD0"/><text x="60" y="67">31 émetteurs</text><text x="60" y="79" font-size="9">dont 9 communs</text><circle cx="60" cy="180" r="24" fill="#F9E7F1" stroke="#9B1B63"/><text x="60" y="177">3 victimes</text><text x="60" y="189" font-size="9">réclamations</text><circle cx="150" cy="125" r="25" fill="#4B1FC2"/><text x="150" y="128" fill="#fff" font-weight="600">L. Morel</text><circle cx="150" cy="210" r="23" fill="#7B4FD6"/><text x="150" y="213" fill="#fff" font-weight="600">T. Barret</text><circle cx="300" cy="70" r="27" fill="#F9E7F1" stroke="#9B1B63"/><text x="300" y="67">Paysolve UAB</text><text x="300" y="79" font-size="9">Lituanie</text><circle cx="300" cy="185" r="25" fill="#F3EAFB" stroke="#9A4FD0"/><text x="300" y="182">Plateforme</text><text x="300" y="194" font-size="9">crypto</text><text x="196" y="172" fill="#9B1B63" font-size="9">même adresse</text><text x="196" y="183" fill="#9B1B63" font-size="9">même appareil</text></g></svg>`,
+  graphNote:'Deux comptes ouverts en ligne à un mois d\'intervalle, alimentés par des émetteurs en partie communs et vidés vers les mêmes destinations.',
+  corr:[['Théo Barret','Même adresse, même empreinte d\'appareil, 9 émetteurs communs','2 alertes ouvertes (flux entrants, sortie rapide)'],['3 clients émetteurs','Virements vers Morel et Barret','Réclamations fraude au faux placement (08-09/2026)']],
+  corrNote:'Profil caractéristique de <b>comptes de passage (mules)</b> : les fonds de victimes d\'escroquerie sont collectés puis évacués vers l\'étranger.',
+  pistes:[['Recherche d\'autres comptes avec la même empreinte d\'appareil ou la même adresse',true],['Revue des documents d\'entrée en relation de Morel et Barret (authenticité)',true],['Transmission à la cellule fraude pour tenter un rappel des fonds des victimes',false],['Analyse des portefeuilles crypto de destination (prestataire d\'analyse blockchain)',false]],
+  chips:['Que sait-on de Théo Barret ?','D\'autres comptes avec le même appareil ?','Quel délai entre entrée et sortie des fonds ?','Qui sont les victimes ?'],
+  chat:[
+   [['barret'],'Théo Barret : entrée en relation en ligne le 03/06/2026. 38 virements entrants de 22 émetteurs, dont 9 communs avec Lucas Morel. Sorties vers les mêmes 2 comptes Paysolve UAB. <span class="src">P3</span><span class="src">P6</span>'],
+   [['appareil','ip','empreinte','même adresse','autres comptes'],'L\'empreinte d\'appareil apparaît sur 3 comptes : Morel, Barret, et un compte clôturé en 07/2026 pour suspicion de fraude documentaire (Inès Royer). Je suggère d\'ajouter ce compte au graphe ; la décision vous appartient. <span class="src">N2-1</span>'],
+   [['délai','delai','sortie','combien de temps'],'Délai médian entre l\'arrivée des fonds et leur sortie : 3 h 40. 71 % des sorties ont lieu entre 22 h et 2 h, depuis l\'application mobile. <span class="src">P5</span>'],
+   [['victime','réclamation','reclamation','émetteur','emetteur'],'3 émetteurs ont déclaré une fraude au faux placement, pour 7 800 € au total. Les virements ont été faits après un contact par messagerie présentant un « rendement garanti ». Je peux préparer une note pour la cellule fraude si vous retenez cette piste. <span class="src">P7</span>'],
+   [['lituanie','paysolve','étranger','etranger','crypto'],'41 200 € ont été envoyés vers 2 comptes Paysolve UAB et 24 500 € vers une plateforme crypto. Le bénéficiaire final n\'est pas identifiable depuis nos données. Une analyse blockchain pourrait suivre les portefeuilles crypto. <span class="src">P5</span>']
+  ],
+  chatDef:'Je n\'ai pas d\'élément tracé dans le dossier sur ce point. Je peux lancer une recherche dans les flux, le case management ou les réclamations : précisez la question et je vous indiquerai les sources consultées.',
+  why:'Deux clients sont concernés et des victimes sont identifiées : seule l\'expertise humaine qualifie le soupçon et les mesures à prendre.',
+  choices:[['Déclaration de soupçon','DS couvrant Morel et Barret'],['Vigilance renforcée','Surveillance accrue, risque KYC relevé'],['Classement motivé','Note de classement']],
+  mot:'Comptes de passage alimentés par des victimes d\'escroquerie et vidés vers l\'étranger ; deux clients liés par l\'adresse, l\'appareil et les contreparties.'
+ },
+ doc(dec,pistes){return `
+  <h4>Décision</h4><p>${dec} – décision de l'expert N2, motivée.</p>
+  <h4>Personnes concernées</h4><p>Lucas Morel, 24 ans, étudiant, client en ligne depuis 05/2026 <span class="src">P1</span>. Théo Barret, client en ligne depuis 06/2026, même adresse et même appareil de connexion <span class="src">P3</span>.</p>
+  <h4>Faits</h4>
+  <p>En 6 semaines, 47 virements entrants de 31 émetteurs pour 68 400 €, avec des libellés génériques <span class="src">P4</span>. 96 % des fonds sont ressortis en moins de 24 h vers 2 comptes en Lituanie (41 200 €) et une plateforme crypto (24 500 €) <span class="src">P5</span>.</p>
+  <p>Théo Barret présente un schéma quasi identique, avec 9 émetteurs communs et les mêmes destinations <span class="src">P6</span>.</p>
+  <h4>Éléments d'analyse</h4>
+  <p>Les flux représentent 76 fois les revenus déclarés <span class="src">P2</span>. 3 émetteurs ont déclaré une fraude au faux placement <span class="src">P7</span>. Le client n'a pas été contacté, pour éviter d'alerter le réseau.</p>
+  <h4>Investigations menées par l'expert</h4><p>${pistes}.</p>`},
+ valid:{ds:'Validation par le déclarant Tracfin',other:'Validation par le responsable LCB-FT',actor:'Déclarant Tracfin – M. Garnier'},
+ writes(ds){return (ds?[['ERMES (Tracfin)','Déclaration de soupçon transmise (2 personnes)','ok','Accusé de réception']]:[]).concat([['Case management','Dossier réseau, décisions et journal archivés','ok','Fait'],['Référentiel KYC','Risque relevé à « élevé » pour Morel et Barret','ok','Fait'],['Cellule fraude','Note de transmission pour les 3 victimes','agent','Transmise'],['Orchestrateur','Décision sur le maintien de la relation','human','À arbitrer par le responsable']])},
+ kycAfter:['risk','Élevé'],
+ learn:['<b>Entrée en relation digitale :</b> signaler en temps réel les empreintes d\'appareil partagées entre nouveaux comptes.','<b>Scénario « compte de passage » :</b> combiner nombre d\'émetteurs, délai de sortie et destination étrangère pour une détection plus précoce.','<b>Fraude et LCB-FT :</b> rapprocher automatiquement les réclamations de fraude des comptes bénéficiaires internes.'],
+ delay:'2 j'
+}
+};
+
+const QUEUE_OFF=[
+ ['DOS-2026-1152','SCI Les Tilleuls','Apport en compte courant d\'associé','1','42','P4','N1'],
+ ['DOS-2026-1158','K. Benali','Homonymie sanctions (screening)','1','55','P3','N1'],
+ ['DOS-2026-1166','Atelier Rousseau SAS','Encaissements chèques hors activité','2','61','P3','N1'],
+ ['DOS-2026-1174','Oriane Conseil','Virements hors UE récurrents','3','69','P3','N1']
+];
+
+/* =====================================================================
+   MOTEUR
+   ===================================================================== */
+let C=null, CK=null, cur=0, humanCount=0, state={};
+let clock={d:7,h:8,m:2};
+const M=()=>document.getElementById('main');
+
+function ts(add){clock.m+=(add===undefined?1:add);while(clock.m>=60){clock.m-=60;clock.h++}while(clock.h>=19){clock.h-=10;clock.d++}return `${String(clock.d).padStart(2,'0')}/10 ${String(clock.h).padStart(2,'0')}:${String(clock.m).padStart(2,'0')}`}
+function log(type,actor,action,detail,add){
+  const e=document.createElement('div');e.className='jentry '+type;
+  e.innerHTML=`<div class="jt"><span>${ts(add)}</span><span>${actor}</span></div><div class="ja">${action}</div><div class="jd">${detail||''}</div>`;
+  document.getElementById('journal').prepend(e);
+}
+function human(){humanCount++;document.getElementById('hHuman').textContent=humanCount+' / '+C.humanTotal}
+function renderPipe(){
+  document.getElementById('pipe').innerHTML=C.path.map((id,i)=>{const s=STEPDEF[id];return `<li class="${i<cur?'done':i===cur?'active':''} ${s.human?'human':''}"><div class="dot">${i<cur?'✓':i+1}</div><div><div class="lbl">${s.lbl}</div><div class="sub">${s.sub}</div></div></li>`}).join('');
+}
+function go(i){cur=i;renderPipe();R[C.path[i]]();M().scrollTop=0}
+function next(){go(cur+1)}
+function sel(el,group){document.querySelectorAll('[data-g="'+group+'"]').forEach(x=>x.classList.remove('sel'));el.classList.add('sel')}
+function esc(s){return s.replace(/'/g,"\\'")}
+
+function startCase(k){
+  CK=k;C=CASES[k];cur=0;humanCount=0;state={canal:null,n1:null,n2:null,pistes:[]};clock={d:7,h:8,m:2};
+  document.getElementById('intro').classList.add('hidden');document.getElementById('app').classList.remove('hidden');
+  document.getElementById('hStats').classList.remove('hidden');
+  document.getElementById('hTitle').textContent='Poste analyste – '+C.name;
+  document.getElementById('hSub').textContent=C.typo+' · Données fictives';
+  document.getElementById('hId').textContent=C.id;document.getElementById('hEta').textContent=C.eta;
+  document.getElementById('hHuman').textContent='0 / '+C.humanTotal;
+  document.getElementById('clientCard').innerHTML=C.client.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('');
+  document.getElementById('journal').innerHTML='';
+  C.init.forEach((l,i)=>log(l[0],l[1],l[2],l[3],i===0?0:1));
+  go(0);
+}
+
+/* ---------------- RENDUS PAR ÉTAPE ---------------- */
+const R={
+triage(){const T=C.triage;const tot=T.rows.reduce((a,r)=>a+r[1],0);
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Agent 1 · Triage & planification</span><h2>${T.title}</h2><p>L'agent consolide les alertes ouvertes sur le même client et ses liens, calcule le score déterministe, applique les règles d'orientation non contournables et planifie le traitement.</p></div>
+<div class="panel"><h3>Alertes consolidées</h3>
+<table><tr><th>Alerte</th><th>Scénario de détection</th><th>Fait générateur</th><th class="num">Montant</th></tr>
+${T.alerts.map(a=>`<tr><td>${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td class="num">${a[3]}</td></tr>`).join('')}</table></div>
+<div class="grid2">
+<div class="panel"><h3>Score déterministe</h3>
+<div style="display:flex;gap:16px;align-items:center"><div class="score">${tot}<span style="font-size:14px;color:var(--muted)">/100</span></div><div style="flex:1;font-size:11.5px;color:var(--muted)">Seuil d'orientation directe N2 : 80</div></div>
+<table style="margin-top:8px">${T.rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join('')}</table>
+<div class="callout">${T.ml}<br><span class="sim">Le modèle peut relever une priorité ou rattacher un dossier, jamais baisser un niveau de vigilance.</span></div>
+</div>
+<div class="panel"><h3>Règles d'orientation fixes</h3>
+${T.rules.map(r=>`<div class="check"><span class="st ${r[0]}">${r[0]==='ok'?'✓':'!'}</span><div>${r[1]}</div></div>`).join('')}
+<div style="margin-top:10px"><span class="tag agent">Orientation</span> <b>${T.orient}</b></div>
+<h3 style="margin-top:14px">Planification</h3>
+<table>${T.plan.map(p=>`<tr><td>${p[0]}</td><td class="num">${p[1]}</td></tr>`).join('')}</table>
+<p class="sim" style="margin-top:6px">L'échéance est recalculée par l'orchestrateur à chaque événement.</p>
+</div></div>
+<div class="callout"><b>Explication de l'orientation :</b> ${T.expl}</div>
+<div class="actions"><span class="sim">Le manager peut réaffecter le dossier ; la correction serait tracée.</span><button class="btn p" onclick="next()">${T.btn}</button></div>`;
+},
+
+analyse(){const A=C.analyse;
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Agent 2 · Analyse</span><h2>Instruction en parallèle</h2><p>${A.intro}</p></div>
+<div class="grid3">${A.subs.map(s=>`<div class="subagent"><div class="sh"><b>${s[1]}</b><span class="tag agent" id="s_${s[0]}">En cours</span></div><div class="sim">${s[2]}</div><div class="prog" id="p_${s[0]}"><i></i></div><ul id="r_${s[0]}" class="hidden">${s[3]}</ul></div>`).join('')}</div>
+<div class="panel hidden" id="pvPanel" style="margin-top:12px"><h3>${A.pvTitle}</h3>
+<table><tr><th>Pièce</th><th>Objet</th><th>Source</th><th>Statut</th></tr>
+${A.pieces.map(p=>`<tr><td>${p[0]}</td><td>${p[1]}</td><td>${p[2]}</td><td><span class="tag ${p[3]}">${p[3]==='ok'?'Disponible':p[3]==='warn'?'À demander':'Non demandée'}</span></td></tr>`).join('')}</table>
+<div class="callout">${A.pvNote}</div></div>
+<div class="actions"><button class="btn p hidden" id="toNext" onclick="next()">${A.btn}</button></div>`;
+log('orch','Orchestrateur','Lancement parallèle de 3 sous-agents','KYC 360, Transactions, Screening · '+C.id);
+A.subs.forEach((s,i)=>setTimeout(()=>{
+  document.querySelector('#p_'+s[0]+' i').style.width='100%';
+  setTimeout(()=>{
+    document.getElementById('r_'+s[0]).classList.remove('hidden');
+    const t=document.getElementById('s_'+s[0]);t.className='tag ok';t.textContent='Terminé';
+    log('agent','Sous-agent '+s[1],'Analyse terminée',s[4]+' · modèle v3.2 / prompt aml-'+s[0]+'-1.4');
+    if(i===A.subs.length-1)setTimeout(()=>{document.getElementById('pvPanel').classList.remove('hidden');document.getElementById('toNext').classList.remove('hidden');log('agent','Sous-agent Preuves','Pièces identifiées',A.pvLog)},500);
+  },1450)},150+i*350));
+},
+
+canal(){const K=C.canal;
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Agent 2 · Preuves</span><h2>${K.title}</h2><p>${K.intro}</p></div>
+<div class="tabs"><button class="on" id="tA" onclick="tab('A')">Vue analyste</button><button id="tB" onclick="tab('B')">Aperçu côté conseiller</button></div>
+<div id="vA">
+<div class="msg"><div class="mh">Projet de message – ${K.gabarit}</div>
+<textarea id="msgTxt" rows="7" oninput="checkGuard()">${K.msg}</textarea></div>
+<div id="guard" class="guard ok">✓ Garde-fou anti-divulgation : aucun terme révélant une analyse ou un soupçon.</div>
+<p class="sim" style="margin-top:4px">Essayez d'ajouter « alerte » ou « suspicion » dans le texte pour voir le blocage.</p>
+</div>
+<div id="vB" class="hidden"><div class="advisor"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Poste conseiller · CRM</div>${K.advisor}<p class="sim" style="margin-top:6px">Le conseiller ne voit ni l'alerte, ni le score, ni l'analyse.</p></div></div>
+<div class="hmoment" style="margin-top:14px">
+<div class="hmh"><span class="badge">DÉCISION HUMAINE ${humanCount+1}/${C.humanTotal}</span><b>Choix du canal</b></div>
+<p class="why">${K.why}</p>
+<div class="choices">${K.choices.map(c=>`<div class="choice" data-g="canal" onclick="sel(this,'canal');state.canal='${esc(c[0])}'">${c[0]===K.reco?'<span class="reco">PROPOSÉ</span>':''}<b>${c[0]}</b><small>${c[1]}</small></div>`).join('')}</div>
+<div class="actions"><button class="btn h" id="sendBtn" onclick="sendReq()">Valider la décision</button></div>
+</div>`;
+},
+
+preuves(){const P=C.preuves;
+M().innerHTML=`
+<div class="stephead"><span class="tag orch">Orchestrateur</span> <span class="tag agent">Agent 2 · Preuves</span><h2>Attente, réception et contrôle de vraisemblance</h2><p>L'orchestrateur met le dossier en attente sans bloquer l'analyste, relance si besoin et reprend le traitement dès réception.</p></div>
+<div class="timeline">${P.tl.map((t,i)=>`<div id="tl${i}" class="${i===0?'on':i===1?'wait':''}">${t}</div>`).join('')}</div>
+<div class="callout orch" id="waitBox">Dossier en attente de pièces (canal : <b>${state.canal}</b>). L'analyste traite d'autres dossiers ; l'échéance reste tenue.<div class="actions" style="margin-top:8px"><button class="btn g" onclick="receive()">Simuler l'écoulement du temps</button></div></div>
+<div id="recv" class="hidden">
+<div class="panel"><h3>Lecture des pièces reçues (OCR / extraction)</h3>
+<table><tr><th>Pièce</th><th>Contenu extrait</th></tr>${P.recv.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table></div>
+<div class="panel"><h3>Contrôle de vraisemblance</h3>
+${P.checks.map(c=>`<div class="check"><span class="st ${c[0]}">${c[0]==='ok'?'✓':'✗'}</span><div>${c[1]}</div></div>`).join('')}</div>
+<div class="actions"><button class="btn p" onclick="next()">Passer au contrôle qualité</button></div>
+</div>`;
+},
+
+qualite(){const Q=C.qualite;const pct=Math.round(Q.conf*100);
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Contrôle qualité</span><h2>Proposition de l'agent Analyse</h2><p>Avant présentation à l'analyste, le contrôle qualité vérifie que chaque affirmation est rattachée à une preuve et mesure la cohérence d'ensemble.</p></div>
+<div class="grid2">
+<div class="panel"><h3>Contrôle du raisonnement</h3>
+<div class="conf"><div class="ring" style="background:conic-gradient(var(--primary) 0 ${pct}%,var(--line) ${pct}% 100%)"><div style="background:#fff;width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center">${Q.conf.toFixed(2).replace('.',',')}</div></div>
+<div style="font-size:12px">Indice de confiance<br><span class="sim">Seuil de présentation : 0,75, calibré sur l'historique des décisions. En dessous, retour automatique à l'agent Analyse.</span></div></div>
+<div style="margin-top:10px">${Q.checks.map(c=>`<div class="check"><span class="st ok">✓</span>${c}</div>`).join('')}</div></div>
+<div class="panel"><h3>Proposition</h3>
+<div style="font-size:15px;font-weight:600;color:var(--${Q.propCls});margin-bottom:6px">${Q.propTitle}</div>
+<p style="font-size:12px">${Q.propText}</p>
+<div class="callout ${Q.callout[0]}" style="margin-top:10px">${Q.callout[1]}</div></div></div>
+<div class="hmoment">
+<div class="hmh"><span class="badge">DÉCISION HUMAINE ${humanCount+1}/${C.humanTotal}</span><b>Décision de l'analyste N1</b></div>
+<p class="why">L'agent propose, l'analyste décide. S'écarter de la proposition est possible, mais doit être motivé ; ces écarts alimentent l'apprentissage.</p>
+<div class="choices">
+${[['renforce','Examen renforcé','Transmission à l\'expert N2'],['complement','Demander un complément','Retour à l\'agent Analyse avec instruction'],['classement','Classer sans suite','Note de classement']].map(c=>`<div class="choice" data-g="n1" onclick="sel(this,'n1');state.n1='${c[0]}';mot(${c[0]!==Q.reco})">${c[0]===Q.reco?'<span class="reco">PROPOSÉ</span>':''}<b>${c[0]===Q.reco?'Valider : ':''}${c[1]}</b><small>${c[2]}</small></div>`).join('')}
+</div>
+<div id="motBox" class="hidden" style="margin-top:10px"><input type="text" id="motTxt" placeholder="Motivation de l'analyste (obligatoire en cas d'écart)"></div>
+<div class="actions"><button class="btn h" onclick="decideN1()">Enregistrer ma décision</button></div>
+</div>`;
+},
+
+n2(){const N=C.n2;
+state.pistes=N.pistes.filter(p=>p[1]).map(p=>p[0]);
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Agent 3 · Analyse renforcée</span> <span class="tag human">L'expert mène</span><h2>Investigation N2 assistée</h2><p>L'agent apporte de la puissance d'analyse : graphe relationnel, corrélation avec d'autres dossiers, pistes, et échange en langage naturel. L'expert choisit ce qu'il approfondit et décide.</p></div>
+<div class="grid2">
+<div class="panel"><h3>Graphe relationnel</h3>${N.graph}<p class="sim">${N.graphNote}</p></div>
+<div class="panel"><h3>Corrélation avec d'autres dossiers</h3>
+<table><tr><th>Client</th><th>Lien</th><th>Antécédent</th></tr>${N.corr.map(c=>`<tr><td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td></tr>`).join('')}</table>
+<div class="callout">${N.corrNote}</div></div></div>
+<div class="chat" style="margin-bottom:12px">
+<div class="chathead"><span><b>Échanger avec l'agent d'analyse renforcée</b> · réponses sourcées, aucune décision</span><span class="sim">Chaque échange est tracé au journal</span></div>
+<div class="chatbody" id="chatBody"><div class="bub a"><div class="who">Agent 3</div>Le dossier est prêt. Posez-moi vos questions sur les flux, les liens ou les antécédents ; je cite les sources de chaque réponse.</div></div>
+<div class="chips">${N.chips.map(c=>`<span class="chip" onclick="ask('${esc(c)}')">${c}</span>`).join('')}</div>
+<div class="chatin"><input type="text" id="chatIn" placeholder="Votre question à l'agent…" onkeydown="if(event.key==='Enter')ask()"><button class="btn p" onclick="ask()">Envoyer</button></div>
+</div>
+<div class="panel"><h3>Pistes proposées par l'agent – l'expert sélectionne</h3><div class="pistes">
+${N.pistes.map(p=>`<label><input type="checkbox" ${p[1]?'checked':''} onchange="pist(this,'${esc(p[0])}')"><div>${p[0]}</div></label>`).join('')}
+</div></div>
+<div class="hmoment">
+<div class="hmh"><span class="badge">DÉCISION HUMAINE ${humanCount+1}/${C.humanTotal}</span><b>Décision de l'expert N2</b></div>
+<p class="why">${N.why}</p>
+<div class="choices">${N.choices.map(c=>`<div class="choice" data-g="n2" onclick="sel(this,'n2');state.n2='${esc(c[0])}'"><b>${c[0]}</b><small>${c[1]}</small></div>`).join('')}</div>
+<div style="margin-top:10px"><input type="text" id="n2Mot" value="${N.mot}"></div>
+<div class="actions"><button class="btn h" onclick="decideN2()">Enregistrer la décision</button></div>
+</div>`;
+},
+
+synthese(){
+const dec=state.n2||'Classement sans suite';const ds=dec==='Déclaration de soupçon';
+const V=C.valid;
+M().innerHTML=`
+<div class="stephead"><span class="tag agent">Agent 4 · Synthèse</span><h2>${ds?'Projet de déclaration de soupçon':'Projet de note de décision'}</h2><p>Rédigé à partir du journal d'audit. Chaque phrase renvoie à une preuve. Aucune écriture ni transmission sans validation humaine.</p></div>
+<div class="doc">${C.doc(dec,state.pistes.join(' ; ')||'Aucune piste complémentaire retenue')}</div>
+<div class="panel" style="margin-top:12px"><h3>Contrôle de complétude</h3>
+<div class="grid2"><div><div class="check"><span class="st ok">✓</span>Champs obligatoires renseignés</div><div class="check"><span class="st ok">✓</span>Toutes les phrases sourcées</div></div>
+<div><div class="check"><span class="st ok">✓</span>Pièces jointes indexées</div><div class="check"><span class="st ok">✓</span>Journal d'audit annexé</div></div></div></div>
+<div class="hmoment">
+<div class="hmh"><span class="badge">DÉCISION HUMAINE ${humanCount+1}/${C.humanTotal}</span><b>${ds?V.ds:V.other}</b></div>
+<p class="why">Le texte reste modifiable. Rien n'est écrit dans les outils ni transmis ${ds?'via ERMES ':''}avant cette validation.</p>
+<textarea rows="2" placeholder="Modifications ou commentaire du validateur (facultatif)"></textarea>
+<div class="actions"><button class="btn g" onclick="log('human','Validateur','Demande de modification','Retour à l\\'agent Synthèse')">Demander une modification</button><button class="btn h" onclick="validate(${ds})">Valider ${ds?'et transmettre':'et archiver'}</button></div>
+</div>`;
+},
+
+cloture(){
+const ds=state.n2==='Déclaration de soupçon';
+M().innerHTML=`
+<div class="stephead"><span class="tag ok">Dossier traité</span><h2>Clôture et boucle d'apprentissage</h2><p>Les décisions sont enregistrées dans les outils de la banque. L'agent Apprentissage exploite les décisions humaines, hors ligne, pour améliorer la détection.</p></div>
+<div class="grid3">
+<div class="kpi"><b>${humanCount}</b><small>décisions humaines aux moments clés</small></div>
+<div class="kpi"><b>${document.querySelectorAll('.jentry').length}</b><small>entrées au journal d'audit</small></div>
+<div class="kpi"><b>${C.delay}</b><small>délai simulé de traitement</small></div></div>
+<div class="panel" style="margin-top:12px"><h3>Écritures effectuées après validation</h3>
+<table>${C.writes(ds).map(w=>`<tr><td>${w[0]}</td><td>${w[1]}</td><td><span class="tag ${w[2]}">${w[3]}</span></td></tr>`).join('')}</table></div>
+<div class="panel"><h3>Agent 5 · Apprentissage – propositions soumises au comité</h3>
+${C.learn.map(l=>`<div class="check"><span class="st" style="color:var(--primary)">→</span><div>${l}</div></div>`).join('')}
+<p class="sim" style="margin-top:6px">Aucun réglage n'est appliqué sans arbitrage du comité de pilotage.</p></div>
+<div class="actions"><button class="btn g" onclick="startCase(CK)">Rejouer ce cas</button><button class="btn p" onclick="showIntro()">Traiter un autre dossier</button></div>`;
+}
+};
+
+/* ---------------- INTERACTIONS ---------------- */
+function tab(t){document.getElementById('vA').classList.toggle('hidden',t!=='A');document.getElementById('vB').classList.toggle('hidden',t!=='B');document.getElementById('tA').classList.toggle('on',t==='A');document.getElementById('tB').classList.toggle('on',t==='B')}
+const BAN=['alerte','soupçon','soupcon','suspicion','suspect','lcb','blanchiment','tracfin','déclaration','enquête','investigation'];
+function checkGuard(){
+  const t=document.getElementById('msgTxt').value.toLowerCase();const hit=BAN.filter(w=>t.includes(w));
+  const g=document.getElementById('guard'),b=document.getElementById('sendBtn');
+  if(hit.length){g.className='guard ko';g.innerHTML='✗ Envoi bloqué – terme(s) susceptible(s) de révéler une analyse : <b>'+hit.join(', ')+'</b>';b.disabled=true}
+  else{g.className='guard ok';g.innerHTML='✓ Garde-fou anti-divulgation : aucun terme révélant une analyse ou un soupçon.';b.disabled=false}
+}
+function sendReq(){
+  if(!state.canal){alert('Choisissez une option.');return}
+  human();
+  const followed=state.canal===C.canal.reco;
+  if(state.canal==='Ne pas solliciter le client'){
+    log('human','Analyste – C. Rivière','Décision : ne pas contacter le client','Proposition de l\'agent acceptée · motif : risque de divulgation et de dissipation des fonds');
+    log('orch','Orchestrateur','Transmission à l\'expert N2','Dossier réseau Morel / Barret');
+  }else{
+    log('agent','Garde-fou','Contrôle anti-divulgation','Texte conforme');
+    log('human','Analyste N1 – C. Rivière','Canal validé : '+state.canal,followed?'Proposition de l\'agent acceptée':'Proposition de l\'agent modifiée par l\'analyste');
+    log('orch','Orchestrateur','Demande envoyée, dossier en attente',C.path[cur+1]==='preuves'?'Relance automatique planifiée':'Réponse non attendue avant décision N2');
+  }
+  next();
+}
+function receive(){
+  const P=C.preuves;
+  P.tl.forEach((t,i)=>{if(i>0)setTimeout(()=>{const el=document.getElementById('tl'+i);if(t!=='–')el.className='on'},i*350)});
+  if(P.delayDays>2){clock.d+=2;log('orch','Orchestrateur','Relance automatique','Aucune pièce reçue à J+2',30);clock.d+=1}else{clock.d+=P.delayDays}
+  log('orch','Orchestrateur','Pièces reçues · reprise du traitement','Échéance recalculée : tenue',90);
+  document.getElementById('hEta').textContent=C.eta2;
+  setTimeout(()=>{document.getElementById('waitBox').classList.add('hidden');document.getElementById('recv').classList.remove('hidden');
+   log('agent','Sous-agent Preuves','Contrôle de vraisemblance',P.log)},1500);
+}
+function mot(show){document.getElementById('motBox').classList.toggle('hidden',!show)}
+function decideN1(){
+  const Q=C.qualite;
+  if(!state.n1){alert('Choisissez une décision.');return}
+  const lbl={renforce:'Examen renforcé',complement:'Complément demandé',classement:'Classement sans suite'}[state.n1];
+  log('agent','Contrôle qualité','Proposition présentée',Q.recoLog);
+  if(state.n1===Q.reco){
+    human();log('human','Analyste N1 – C. Rivière',lbl+' validé','Proposition de l\'agent confirmée');next();return;
+  }
+  const m=document.getElementById('motTxt').value.trim();
+  if(!m){alert('La motivation est obligatoire lorsque vous vous écartez de la proposition.');return}
+  log('human','Analyste N1 – C. Rivière',lbl+' (écart avec la proposition)',m+' · écart signalé à l\'agent Apprentissage');
+  alert('Décision enregistrée et motivée. Pour la démonstration, le scénario principal reprend avec la proposition de l\'agent.');
+}
+function pist(cb,t){if(cb.checked){state.pistes.push(t);log('human','Expert N2 – A. Delorme','Piste retenue',t)}else{state.pistes=state.pistes.filter(x=>x!==t)}}
+function ask(q){
+  const inp=document.getElementById('chatIn');q=q||inp.value.trim();if(!q)return;inp.value='';
+  const body=document.getElementById('chatBody');
+  body.insertAdjacentHTML('beforeend',`<div class="bub u"><div class="who">Expert N2</div>${q.replace(/</g,'&lt;')}</div>`);
+  body.insertAdjacentHTML('beforeend',`<div class="bub a" id="typing"><div class="who">Agent 3</div><span class="sim">Recherche dans le dossier…</span></div>`);
+  body.scrollTop=body.scrollHeight;
+  log('human','Expert N2 – A. Delorme','Question à l\'agent',q.replace(/</g,'&lt;'));
+  const ql=q.toLowerCase();const hit=C.n2.chat.find(r=>r[0].some(k=>ql.includes(k)));
+  const ans=hit?hit[1]:C.n2.chatDef;
+  setTimeout(()=>{const t=document.getElementById('typing');t.removeAttribute('id');t.innerHTML='<div class="who">Agent 3</div>'+ans;body.scrollTop=body.scrollHeight;
+    log('agent','Agent Analyse renforcée','Réponse fournie',hit?'Réponse sourcée':'Aucune donnée tracée · recherche proposée')},900);
+}
+function decideN2(){
+  if(!state.n2){alert('Choisissez une décision.');return}
+  human();log('human','Expert N2 – A. Delorme','Décision : '+state.n2,document.getElementById('n2Mot').value);
+  log('agent','Agent Synthèse','Rédaction lancée','Source : journal d\'audit · gabarit '+(state.n2==='Déclaration de soupçon'?'DS-ERMES':'note-décision'));
+  next();
+}
+function validate(ds){
+  human();
+  log('human',ds?C.valid.actor:(CK==='B'?C.valid.actor:'Responsable LCB-FT'),'Validation finale',ds?'DS validée pour transmission':'Note validée');
+  if(ds)log('orch','Orchestrateur','Transmission ERMES','Accusé de réception enregistré');
+  log('orch','Orchestrateur','Écritures dans les outils','Case management · référentiel KYC'+(CK==='A'?' · 2 dossiers liés créés':''));
+  if(ds||CK==='B'){const k=document.getElementById('kycRisk');k.className='tag '+C.kycAfter[0];k.textContent=C.kycAfter[1]}
+  log('agent','Agent Apprentissage','Analyse hors ligne',C.learn.length+' propositions soumises au comité de pilotage');
+  next();
+}
+
+/* ---------------- INTRO / VISION ---------------- */
+function showIntro(){
+  document.getElementById('app').classList.add('hidden');document.getElementById('intro').classList.remove('hidden');
+  document.getElementById('hStats').classList.add('hidden');
+  document.getElementById('hTitle').textContent='Traitement agentique des alertes LCB-FT';
+  document.getElementById('hSub').textContent='Démonstrateur Wavestone · Données fictives · Banque de détail';
+  const playable=['A','B','C'];
+  document.getElementById('intro').innerHTML=`
+<div class="hero"><h1>L'agent instruit, l'humain décide aux moments clés</h1>
+<p>Cinq agents spécialisés, coordonnés par un orchestrateur à règles fixes, prennent en charge le tri, l'instruction et la rédaction. L'analyste et l'expert gardent la main sur chaque décision qui engage la banque, et chaque étape est tracée au fil de l'eau.</p></div>
+
+<div class="flow">
+<div class="fnode ag"><b>1 · Triage & planification</b>Regroupe par client et par réseau, score déterministe, orientation N1 / N2, délai prévu</div><div class="farrow">›</div>
+<div class="fnode ag"><b>2 · Analyse N1</b>KYC 360, Transactions, Screening, Preuves, en parallèle, puis contrôle qualité</div><div class="farrow">›</div>
+<div class="fnode hu"><b>Analyste N1</b>Contact client · décision</div><div class="farrow">›</div>
+<div class="fnode ag"><b>3 · Analyse renforcée</b>Graphe, corrélations, échange conversationnel avec l'expert</div><div class="farrow">›</div>
+<div class="fnode hu"><b>Expert N2</b>Qualifie le soupçon</div><div class="farrow">›</div>
+<div class="fnode ag"><b>4 · Synthèse</b>Note ou DS sourcée, à partir du journal</div><div class="farrow">›</div>
+<div class="fnode hu"><b>Déclarant</b>Valide, transmet</div>
+</div>
+<div class="socle"><span><b>Socle :</b></span><span>Orchestrateur durable</span><span>Journal d'audit immuable</span><span>Garde-fous anti-divulgation</span><span>Couche d'outils (droits par agent)</span><span>Passerelle LLM souveraine</span><span><b>5 · Apprentissage</b> hors ligne vers la détection</span></div>
+
+<div class="grid4" style="margin:18px 0">
+<div class="kpi"><b>312</b><small>alertes reçues ce matin</small></div>
+<div class="kpi"><b>184</b><small>dossiers après regroupement</small></div>
+<div class="kpi"><b>141 / 29</b><small>orientés N1 / N2</small></div>
+<div class="kpi"><b>14</b><small>en attente de pièces client</small></div></div>
+<p class="sim" style="margin:-8px 0 14px">Volumes fictifs, à titre d'illustration.</p>
+
+<h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px">Trois parcours à démontrer</h3>
+<div class="grid3">
+${playable.map(k=>{const c=CASES[k];return `<div class="casecard"><div class="ct">${c.type} · ${c.orient}</div><h3>${c.typo}</h3><p>${c.pitch}</p><ul>${c.shows.map(s=>`<li>${s}</li>`).join('')}</ul><div style="display:flex;justify-content:space-between;align-items:center"><span class="tag human">${c.humanTotal} décisions humaines</span><button class="btn p" onclick="startCase('${k}')">Traiter le dossier</button></div></div>`}).join('')}
+</div>
+
+<div class="panel" style="margin-top:16px"><h3>File de travail du jour</h3>
+<table class="queue"><tr><th>Dossier</th><th>Client</th><th>Typologie</th><th class="num">Alertes</th><th class="num">Score</th><th>Priorité</th><th>Orientation</th><th></th></tr>
+${playable.map(k=>{const c=CASES[k];return `<tr class="play" onclick="startCase('${k}')"><td><b>${c.id}</b></td><td>${c.name}</td><td>${c.typo}</td><td class="num">${c.nbAlerts}</td><td class="num">${c.score}</td><td><span class="tag ${c.prio==='P1'?'risk':c.prio==='P2'?'warn':'ok'}">${c.prio}</span></td><td>${c.orient}</td><td><span class="tag agent">Démo</span></td></tr>`}).join('')}
+${QUEUE_OFF.map(r=>`<tr class="off"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td><span class="tag grey">Hors démo</span></td></tr>`).join('')}
+</table></div>`;
+}
+showIntro();
+</script>
+</body>
+</html>
